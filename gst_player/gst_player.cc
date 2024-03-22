@@ -11,7 +11,8 @@ GstPlayer::GstPlayer(const std::vector<std::string>& cmd_arguments) {
     char  arg1[] = GstPlayer_GstInit_Arg1;
     char* argv[] = { &arg0[0], &arg1[0], NULL };
     int   argc   = (int)(sizeof(argv) / sizeof(argv[0])) - 1;
-    gst_init(&argc, (char ***)&argv);
+    // gst_init(&argc, (char ***)&argv);
+    gst_init(&argc, NULL);
   } else {
     // TODO handle this case, pass command line arguments to gstreamer
   }
