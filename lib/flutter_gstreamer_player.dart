@@ -11,6 +11,9 @@ class GstPlayerTextureController {
   int textureId = 0;
   static int _id = 0;
   bool isPlaying = false;
+  final String pipeline;
+
+  GstPlayerTextureController(this.pipeline);
 
   Future<int> initialize(String pipeline) async {
     // No idea why, but you have to increase `_id` first before pass it to method channel,
@@ -82,26 +85,27 @@ class GstPlayerTextureController {
 }
 
 class GstPlayer extends StatefulWidget {
-  final String pipeline;
+  final GstPlayerTextureController controller;
 
-  const GstPlayer({Key? key, required this.pipeline}) : super(key: key);
+  const GstPlayer({Key? key, required this.controller}) : super(key: key);
 
   @override
   State<GstPlayer> createState() => _GstPlayerState();
 }
 
 class _GstPlayerState extends State<GstPlayer> {
-  final _controller = GstPlayerTextureController();
+  late final GstPlayerTextureController _controller;
 
   @override
   void initState() {
+    _controller = widget.controller;
     initializeController();
     super.initState();
   }
 
   @override
   void didUpdateWidget(GstPlayer oldWidget) {
-    if (widget.pipeline != oldWidget.pipeline) {
+    if (widget.controller.pipeline != oldWidget.controller.pipeline) {
       initializeController();
     }
     super.didUpdateWidget(oldWidget);
@@ -114,7 +118,7 @@ class _GstPlayerState extends State<GstPlayer> {
   }
 
   Future<void> initializeController() async {
-    await _controller.initialize(widget.pipeline);
+    await _controller.initialize(_controller.pipeline);
     setState(() {});
   }
 
