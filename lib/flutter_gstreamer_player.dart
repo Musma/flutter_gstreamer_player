@@ -11,13 +11,8 @@ class GstPlayerTextureController {
   int textureId = 0;
   static int _id = 0;
   bool isPlaying = false;
-  final String pipeline;
-
-  GstPlayerTextureController(this.pipeline);
 
   Future<int> initialize(String pipeline) async {
-    // No idea why, but you have to increase `_id` first before pass it to method channel,
-    // if not, receiver of method channel always received 0
     GstPlayerTextureController._id = GstPlayerTextureController._id + 1;
 
     textureId = await _channel.invokeMethod('PlayerRegisterTexture', {
@@ -84,41 +79,85 @@ class GstPlayerTextureController {
   bool get isInitialized => textureId != 0;
 }
 
-class GstPlayer extends StatefulWidget {
-  final GstPlayerTextureController controller;
+enum GstPlayerCommand { play, pause, stop, seekTo }
 
-  const GstPlayer({Key? key, required this.controller}) : super(key: key);
+class GstPlayer extends StatefulWidget {
+  final String pipeline;
+  final ValueNotifier<GstPlayerCommand>? controll;
+  final ValueNotifier<Duration>? seekPosition;
+
+  const GstPlayer({super.key, required this.pipeline, this.controll, this.seekPosition});
 
   @override
   State<GstPlayer> createState() => _GstPlayerState();
 }
 
 class _GstPlayerState extends State<GstPlayer> {
-  late final GstPlayerTextureController _controller;
+  final _controller = GstPlayerTextureController();
+  late VoidCallback _commandListener;
+  late VoidCallback _seekListener;
 
   @override
   void initState() {
-    _controller = widget.controller;
-    initializeController();
     super.initState();
+    initializeController();
+    _commandListener = () {
+      if (widget.controll == null) return;
+      switch (widget.controll!.value) {
+        case GstPlayerCommand.play:
+          _controller.play();
+          break;
+        case GstPlayerCommand.pause:
+          _controller.pause();
+          break;
+        case GstPlayerCommand.stop:
+          _controller.stop();
+          break;
+        default:
+          break;
+      }
+    };
+    if (widget.controll != null) {
+      widget.controll!.addListener(_commandListener);
+    }
+    _seekListener = () {
+      if (widget.seekPosition == null) return;
+      _controller.seekTo(widget.seekPosition!.value);
+    };
+    if (widget.seekPosition != null) {
+      widget.seekPosition!.addListener(_seekListener);
+    }
   }
 
   @override
   void didUpdateWidget(GstPlayer oldWidget) {
-    if (widget.controller.pipeline != oldWidget.controller.pipeline) {
+    if (widget.pipeline != oldWidget.pipeline) {
+      _controller.stop();
+      _controller.dispose();
       initializeController();
+    }
+    if (oldWidget.controll != widget.controll) {
+      oldWidget.controll?.removeListener(_commandListener);
+      widget.controll?.addListener(_commandListener);
+    }
+    if (oldWidget.seekPosition != widget.seekPosition) {
+      oldWidget.seekPosition?.removeListener(_seekListener);
+      widget.seekPosition?.addListener(_seekListener);
     }
     super.didUpdateWidget(oldWidget);
   }
 
   @override
   void dispose() {
+    widget.controll?.removeListener(_commandListener);
+    widget.seekPosition?.removeListener(_seekListener);
+    _controller.stop();
     _controller.dispose();
     super.dispose();
   }
 
   Future<void> initializeController() async {
-    await _controller.initialize(_controller.pipeline);
+    await _controller.initialize(widget.pipeline);
     setState(() {});
   }
 
@@ -132,7 +171,6 @@ class _GstPlayerState extends State<GstPlayer> {
         return Container(
           child: _controller.isInitialized ? Texture(textureId: _controller.textureId) : null,
         );
-        break;
       case TargetPlatform.iOS:
         String viewType = _controller.textureId.toString();
         final Map<String, dynamic> creationParams = <String, dynamic>{};
@@ -142,7 +180,6 @@ class _GstPlayerState extends State<GstPlayer> {
           creationParams: creationParams,
           creationParamsCodec: const StandardMessageCodec(),
         );
-        break;
       default:
         throw UnsupportedError('Unsupported platform view');
     }
